@@ -6,7 +6,7 @@ use warnings;
 use Parse::DMIDecode;
 use Parse::HP::ACU;
 
-my $VERSION = "0.1.0";
+my $VERSION = "0.1.1";
 
 my $dmi = Parse::DMIDecode->new(
   dmidecode => "/usr/sbin/dmidecode",
@@ -133,6 +133,23 @@ foreach my $controller_key (sort keys %{$controllers})
     foreach my $physical_drive_key (sort keys %{$array->{physical_drive}})
     {
       my $physical_drive = $array->{physical_drive}->{$physical_drive_key};
+      printf "    Physical Drive %s: %s, %s, %0.1fk RPM, %s\n",
+        $physical_drive_key,
+        $physical_drive->{'interface_type'},
+        $physical_drive->{'size'},
+        $physical_drive->{'rotational_speed'} / 1000,
+        $physical_drive->{'status'},;
+    }
+  }
+
+  if(exists $controller->{'unassigned'})
+  {
+    my $unassigned = $controller->{'unassigned'};
+
+    print "  Unassigned Drives:\n";
+    foreach my $physical_drive_key (sort keys %{$unassigned->{physical_drive}})
+    {
+      my $physical_drive = $unassigned->{physical_drive}->{$physical_drive_key};
       printf "    Physical Drive %s: %s, %s, %0.1fk RPM, %s\n",
         $physical_drive_key,
         $physical_drive->{'interface_type'},
