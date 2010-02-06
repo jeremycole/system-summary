@@ -1,0 +1,148 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use Parse::DMIDecode;
+use Parse::HP::ACU;
+
+my $VERSION = "0.1.0";
+
+my $dmi = Parse::DMIDecode->new(
+  dmidecode => "/usr/sbin/dmidecode",
+  nowarnings => 1,
+);
+
+$dmi->probe;
+
+printf "System Information:\n";
+printf "  Model: %s %s\n",
+  $dmi->keyword('system-manufacturer'),
+  $dmi->keyword('system-product-name');
+printf "  Serial Number: %s\n",
+  $dmi->keyword('system-serial-number');
+print "\n";
+
+printf "Processor Information:\n";
+foreach my $handle ($dmi->get_handles(group => 'processor'))
+{
+  printf "  %s: %s %s %s, %s cores\n",
+    $handle->keyword('processor-socket-designation'),
+    $handle->keyword('processor-manufacturer'),
+    $handle->keyword('processor-family'),
+    $handle->keyword('processor-current-speed'),
+    defined($handle->keyword('processor-core-count'))?
+      $handle->keyword('processor-core-count'):"unknown";
+}
+print "\n";
+
+my $memory_total = 0;
+printf "Memory Information:\n";
+foreach my $handle ($dmi->get_handles(group => 'memory'))
+{
+  if(defined($handle->keyword('memory-locator')))
+  {
+    if($handle->keyword('memory-size') ne 'No Module Installed')
+    {
+      if($handle->keyword('memory-size') =~ /([0-9]+)/)
+      {
+        $memory_total += $1;
+      }
+
+      printf "  %s: %s, %s\n",
+        $handle->keyword('memory-locator'),
+        $handle->keyword('memory-size'),
+        $handle->keyword('memory-speed')
+    } else {
+      printf "  %s: Empty\n",
+        $handle->keyword('memory-locator');
+    }
+  }
+}
+printf "  Total Memory: %s MB\n", $memory_total;
+
+print "\n";
+
+my $hp_acu = Parse::HP::ACU->new();
+
+my $controllers = $hp_acu->parse_config();
+
+foreach my $controller_key (sort keys %{$controllers})
+{
+  my $controller = $controllers->{$controller_key};
+  printf "Storage Controller %s: HP %s, %s arrays, %s\n",
+    $controller_key,
+    $controller->{'description'},
+    scalar keys %{$controller->{'array'}},
+    $controller->{'controller_status'};
+
+  if($controller->{'cache_board_present'} eq 'True')
+  {
+    my $battery_status;
+    if(exists $controller->{'battery_capacitor_count'})
+    {
+      $battery_status = sprintf "BBWC %s",
+        $controller->{'battery_capacitor_status'};
+    } else {
+      $battery_status = "BBWC Not Present";
+    }
+
+    printf "  Cache: %s, %s%%/%s%%, %s, %s\n",
+      $controller->{'total_cache_size'},
+      $controller->{'accelerator_ratio'}->{'read'},
+      $controller->{'accelerator_ratio'}->{'write'},
+      $battery_status,
+      $controller->{'cache_status'};
+  } else {
+    printf "  Cache: Not Present\n";
+  }
+
+
+  foreach my $array_key (sort keys %{$controller->{array}})
+  {
+    my $array = $controller->{array}->{$array_key};
+    printf "  Array %s: %s, %s logical, %s physical, %s\n",
+      $array_key,
+      $array->{'interface_type'},
+      scalar keys %{$array->{'logical_drive'}},
+      scalar keys %{$array->{'physical_drive'}},
+      $array->{'status'};
+
+    foreach my $logical_drive_key (sort keys %{$array->{logical_drive}})
+    {
+      my $logical_drive = $array->{logical_drive}->{$logical_drive_key};
+
+      my $logical_drive_disk_name = $logical_drive->{'disk_name'};
+      $logical_drive_disk_name =~ s/\/dev\/cciss\///g;
+
+      printf "    Logical Drive %s: %s, %s, %s, %s stripe, write %s, %s\n",
+        $logical_drive_key,
+        $logical_drive_disk_name,
+        $logical_drive->{'size'},
+        $logical_drive->{'fault_tolerance'},
+        $logical_drive->{'stripe_size'},
+        $logical_drive->{'array_accelerator'} eq 'Enabled'?'back':'through',
+        $logical_drive->{'status'};
+        
+      foreach my $mirror_group_key (sort keys %{$logical_drive->{mirror_group}})
+      {
+        my $mirror_group = $logical_drive->{mirror_group}->{$mirror_group_key};
+        printf "      Mirror Group %s: %s\n", $mirror_group_key, (join ", ", sort @{$mirror_group});
+      }
+    }
+    foreach my $physical_drive_key (sort keys %{$array->{physical_drive}})
+    {
+      my $physical_drive = $array->{physical_drive}->{$physical_drive_key};
+      printf "    Physical Drive %s: %s, %s, %0.1fk RPM, %s\n",
+        $physical_drive_key,
+        $physical_drive->{'interface_type'},
+        $physical_drive->{'size'},
+        $physical_drive->{'rotational_speed'} / 1000,
+        $physical_drive->{'status'},;
+    }
+  }
+
+  print "\n";
+}
+
+#print Dumper $c;
