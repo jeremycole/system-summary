@@ -27,8 +27,6 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 BuildArch: noarch
 
 Requires: perl-Parse-DMIDecode
-Requires: perl-Parse-HP-ACU >= 0.02
-Requires: hpacucli
 
 %description
 Provide a concise summary of hardware present in a system. Mostly works with HP.
