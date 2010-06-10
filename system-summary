@@ -202,8 +202,9 @@ sub main
   if($dmi->keyword('system-manufacturer') eq 'HP'
     and $dmi->keyword('system-product-name') =~ /DL/)
   {
+    # This ensures that rpmbuild doesn't auto-add a dependency.
+    eval q{use } . q{Parse::HP::ACU;};
     eval q{
-      use Parse::HP::ACU;
       my $hp_acu = Parse::HP::ACU->new();
       summarize_hp_raid($dmi, $hp_acu);
     };
