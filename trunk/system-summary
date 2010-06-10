@@ -202,9 +202,11 @@ sub main
   if($dmi->keyword('system-manufacturer') eq 'HP'
     and $dmi->keyword('system-product-name') =~ /DL/)
   {
-    use Parse::HP::ACU;
-    my $hp_acu = Parse::HP::ACU->new();
-    summarize_hp_raid($dmi, $hp_acu);
+    eval q{
+      use Parse::HP::ACU;
+      my $hp_acu = Parse::HP::ACU->new();
+      summarize_hp_raid($dmi, $hp_acu);
+    };
   }
 }
 
